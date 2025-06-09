@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="de">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Shooting Game mit Shop</title>
+		<style>
+			body {
+				margin: 0;
+				font-family: Arial, sans-serif;
+				background-color: #000;
+				color: #fff;
+				text-align: center;
+			}
+
+			h1 {
+				margin: 20px;
+			}
+
+			#score,
+			#timer,
+			#coins,
+			#highscore {
+				font-size: 22px;
+				margin: 5px;
+			}
+
+			#gameArea {
+				width: 100%;
+				max-width: 800px;
+				height: 500px;
+				margin: 20px auto;
+				background-color: #111;
+				position: relative;
+				border: 3px solid #9146ff;
+				touch-action: manipulation;
+			}
+
+			.target {
+				width: 60px;
+				height: 60px;
+				border-radius: 50%;
+				position: absolute;
+				box-shadow: 0 0 10px currentColor;
+				transition: transform 0.1s ease;
+			}
+
+			.hit {
+				animation: pop 0.2s ease;
+			}
+
+			@keyframes pop {
+				0% {
+					transform: scale(1);
+				}
+				50% {
+					transform: scale(1.4);
+				}
+				100% {
+					transform: scale(0);
+				}
+			}
+
+			button,
+			select {
+				padding: 10px 20px;
+				font-size: 16px;
+				background-color: #9146ff;
+				color: white;
+				border: none;
+				border-radius: 6px;
+				margin: 5px;
+			}
+
+			button:hover {
+				background-color: #772ce8;
+			}
+
+			#shop {
+				margin-top: 20px;
+				background-color: #222;
+				padding: 10px;
+				border: 2px solid #9146ff;
+				max-width: 800px;
+				margin-left: auto;
+				margin-right: auto;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>🔫 Shooting Game mit Shop</h1>
+		<div id="score">Punkte: 0</div>
+		<div id="coins">Coins: 0</div>
+		<div id="highscore">Highscore: 0</div>
+		<div id="timer">Zeit: 30</div>
+
+		<button onclick="startGame()">Spiel starten</button>
+
+		<select id="weaponSelect">
+			<option value="default">🔴 Standard (gratis)</option>
+		</select>
+
+		<div id="gameArea"></div>
+
+		<div id="shop">
+			<h2>🛒 Waffen-Shop</h2>
+			<button onclick="buyWeapon('laser', 10)">
+				🔵 Laser (10 Coins)
+			</button>
+			<button onclick="buyWeapon('sniper', 20)">
+				⚪ Sniper (20 Coins)
+			</button>
+		</div>
+
+		<audio
+			id="hitSound"
+			src="https://www.soundjay.com/button/beep-07.wav"
+			preload="auto"
+		></audio>
+
+		<script>
+			const gameArea = document.getElementById("gameArea");
+			const scoreDisplay = document.getElementById("score");
+			const coinsDisplay = document.getElementById("coins");
+			const timerDisplay = document.getElementById("timer");
+			const highscoreDisplay = document.getElementById("highscore");
+			const hitSound = document.getElementById("hitSound");
+			const weaponSelect = document.getElementById("weaponSelect");
+
+			let score = 0;
+			let coins = parseInt(localStorage.getItem("coins")) || 0;
+			let highscore = parseInt(localStorage.getItem("highscore")) || 0;
+			let unlockedWeapons = JSON.parse(
+				localStorage.getItem("weapons")
+			) || ["default"];
+			let timeLeft = 30;
+			let gameRunning = false;
+			let target;
+			let timerInterval;
+
+			const weaponColors = {
+				default: "red",
+				laser: "cyan",
+				sniper: "white",
+			};
+
+			updateUI();
+
+			function updateUI() {
+				coinsDisplay.textContent = "Coins: " + coins;
+				highscoreDisplay.textContent = "Highscore: " + highscore;
+
+				// Waffen im Select aktualisieren
+				weaponSelect.innerHTML = "";
+				unlockedWeapons.forEach((weapon) => {
+					const option = document.createElement("option");
+					option.value = weapon;
+					option.textContent = getWeaponLabel(weapon);
+					weaponSelect.appendChild(option);
+				});
+			}
+
+			function getWeaponLabel(weapon) {
+				switch (weapon) {
+					case "default":
+						return "🔴 Standard";
+					case "laser":
+						return "🔵 Laser";
+					case "sniper":
+						return "⚪ Sniper";
+					default:
+						return weapon;
+				}
+			}
+
+			function spawnTarget() {
+				if (target) target.remove();
+
+				const size = 60;
+				const maxX = gameArea.clientWidth - size;
+				const maxY = gameArea.clientHeight - size;
+				const x = Math.random() * maxX;
+				const y = Math.random() * maxY;
+
+				const weapon = weaponSelect.value;
+				const color = weaponColors[weapon] || "red";
+
+				target = document.createElement("div");
+				target.classList.add("target");
+				target.style.backgroundColor = color;
+				target.style.color = color;
+				target.style.left = x + "px";
+				target.style.top = y + "px";
+
+				function hit() {
+					if (!gameRunning) return;
+					score++;
+					coins++;
+					scoreDisplay.textContent = "Punkte: " + score;
+					coinsDisplay.textContent = "Coins: " + coins;
+					localStorage.setItem("coins", coins);
+					hitSound.currentTime = 0;
+					hitSound.play();
+					target.classList.add("hit");
+					setTimeout(() => spawnTarget(), 150);
+				}
+
+				target.addEventListener("click", hit);
+				target.addEventListener(
+					"touchstart",
+					function (e) {
+						e.preventDefault();
+						hit();
+					},
+					{ passive: false }
+				);
+
+				gameArea.appendChild(target);
+			}
+
+			function startGame() {
+				if (gameRunning) return;
+
+				score = 0;
+				timeLeft = 30;
+				scoreDisplay.textContent = "Punkte: 0";
+				timerDisplay.textContent = "Zeit: 30";
+				gameRunning = true;
+
+				spawnTarget();
+
+				clearInterval(timerInterval);
+				timerInterval = setInterval(() => {
+					timeLeft--;
+					timerDisplay.textContent = "Zeit: " + timeLeft;
+					if (timeLeft <= 0) endGame();
+				}, 1000);
+			}
+
+			function endGame() {
+				gameRunning = false;
+				clearInterval(timerInterval);
+				if (target) target.remove();
+
+				if (score > highscore) {
+					highscore = score;
+					localStorage.setItem("highscore", highscore);
+					highscoreDisplay.textContent = "Highscore: " + highscore;
+					alert("🏆 Neuer Highscore: " + score + " Punkte!");
+				} else {
+					alert("⏰ Zeit vorbei! Punkte: " + score);
+				}
+			}
+
+			function buyWeapon(weapon, cost) {
+				if (unlockedWeapons.includes(weapon)) {
+					alert("✅ Du besitzt diese Waffe bereits!");
+					return;
+				}
+				if (coins >= cost) {
+					coins -= cost;
+					unlockedWeapons.push(weapon);
+					localStorage.setItem("coins", coins);
+					localStorage.setItem(
+						"weapons",
+						JSON.stringify(unlockedWeapons)
+					);
+					updateUI();
+					alert("🛒 Waffe freigeschaltet: " + getWeaponLabel(weapon));
+				} else {
+					alert("❌ Nicht genug Coins!");
+				}
+			}
+		</script>
+	</body>
+</html>
